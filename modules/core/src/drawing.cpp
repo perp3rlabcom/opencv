@@ -40,6 +40,17 @@
 //M*/
 #include "precomp.hpp"
 
+#if defined(ACAP)
+namespace std
+{
+  //ACAP has only C++98 so std::abs(long long int) is not present. Thus, add it:
+  long long int abs(long long val)
+  {
+    return llabs(val);
+  }
+}
+#endif
+
 namespace cv
 {
 
@@ -1020,7 +1031,8 @@ EllipseEx( Mat& img, Point2l center, Size2l axes,
     ellipse2Poly( Point2d((double)center.x, (double)center.y), Size2d((double)axes.width, (double)axes.height), angle, arc_start, arc_end, delta, _v );
 
     vector<Point2l> v;
-    Point2l prevPt(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF);
+    Point2l prevPt(std::numeric_limits<long long>::max(),
+                   std::numeric_limits<long long>::max());
     v.resize(0);
     for (unsigned int i = 0; i < _v.size(); ++i)
     {
@@ -1309,7 +1321,8 @@ FillEdgeCollection( Mat& img, vector<PolyEdge>& edges, const void* color )
     Size size = img.size();
     PolyEdge* e;
     int y_max = INT_MIN, y_min = INT_MAX;
-    int64 x_max = 0xFFFFFFFFFFFFFFFF, x_min = 0x7FFFFFFFFFFFFFFF;
+    int64 x_max = std::numeric_limits<int64>::max();
+    int64 x_min = std::numeric_limits<int64>::min();
     int pix_size = (int)img.elemSize();
 
     if( total < 2 )
