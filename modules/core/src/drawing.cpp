@@ -40,17 +40,6 @@
 //M*/
 #include "precomp.hpp"
 
-#if defined(ACAP)
-namespace std
-{
-  //ACAP has only C++98 so std::abs(long long int) is not present. Thus, add it:
-  long long int abs(long long val)
-  {
-    return llabs(val);
-  }
-}
-#endif
-
 namespace cv
 {
 
