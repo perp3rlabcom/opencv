@@ -31,6 +31,23 @@ int strcasecmp(const char* s1, const char* s2)
     return len1 < len2 ? -1 : len1 > len2 ? 1 : 0;
 }
 
+char* uitoa( unsigned int val, char* buffer, int /*radix*/ )
+{
+    const int radix = 10;
+    char* ptr=buffer + 23 /* enough even for 64-bit integers (TBC) */;
+
+    *ptr = '\0';
+    do
+    {
+        unsigned r = val / radix;
+        *--ptr = (char)(val - (r*radix) + '0');
+        val = r;
+    }
+    while( val != 0 );
+
+    return ptr;
+}
+
 char* itoa( int _val, char* buffer, int /*radix*/ )
 {
     const int radix = 10;
@@ -284,6 +301,15 @@ int decodeSimpleFormat( const char* dt )
 #define CV_UNALIGNED_LITTLE_ENDIAN_MEM_ACCESS 0
 #endif
 
+static inline unsigned int readUInt(const uchar* p)
+{
+#if CV_UNALIGNED_LITTLE_ENDIAN_MEM_ACCESS
+    return *(const unsigned int*)p;
+#else
+    return (unsigned int)(p[0] | (p[1] << 8) | (p[2] << 16) | (p[3] << 24));
+#endif
+}
+
 static inline int readInt(const uchar* p)
 {
 #if CV_UNALIGNED_LITTLE_ENDIAN_MEM_ACCESS
@@ -317,6 +343,19 @@ static inline void writeInt(uchar* p, int ival)
     p[1] = (uchar)(ival >> 8);
     p[2] = (uchar)(ival >> 16);
     p[3] = (uchar)(ival >> 24);
+#endif
+}
+
+static inline void writeUInt(uchar* p, unsigned int uival)
+{
+#if CV_UNALIGNED_LITTLE_ENDIAN_MEM_ACCESS
+    unsigned int* ip = (unsigned int*)p;
+    *ip = uival;
+#else
+    p[0] = (uchar)uival;
+    p[1] = (uchar)(uival >> 8);
+    p[2] = (uchar)(uival >> 16);
+    p[3] = (uchar)(uival >> 24);
 #endif
 }
 
@@ -1031,6 +1070,12 @@ public:
         }
     }
 
+    void write( const String& key, unsigned int value )
+    {
+        CV_Assert(write_mode);
+        emitter->write(key.c_str(), value);
+    }
+
     void write( const String& key, int value )
     {
         CV_Assert(write_mode);
@@ -1248,6 +1293,7 @@ public:
         bool named = node.isNamed();
         uchar* ptr = node.ptr() + 1 + (named ? 4 : 0);
 
+        unsigned int uival = 0;
         int ival = 0;
         double fval = 0;
         std::string sval;
@@ -1276,6 +1322,11 @@ public:
                 sval = std::string(node);
                 add_first_scalar = true;
             }
+            else if( node_type == FileNode::UINT )
+            {
+                uival = readInt(ptr);
+                add_first_scalar = true;
+            }
             else
                 CV_Error_(Error::StsError, ("The node of type %d cannot be converted to collection", node_type));
         }
@@ -1293,7 +1344,8 @@ public:
             addNode(node, std::string(), node_type,
                     node_type == FileNode::INT ? (const void*)&ival :
                     node_type == FileNode::REAL ? (const void*)&fval :
-                    node_type == FileNode::STRING ? (const void*)sval.c_str() : 0,
+                    node_type == FileNode::STRING ? (const void*)sval.c_str() :
+                    node_type == FileNode::UINT ? (const void*)&uival : 0,
                     -1);
     }
 
@@ -1938,6 +1990,11 @@ void FileStorage::writeComment( const String& comment, bool eol_comment )
     p->writeComment(comment.c_str(), eol_comment);
 }
 
+void writeScalar( FileStorage& fs, unsigned int value )
+{
+    fs.p->write(String(), value);
+}
+
 void writeScalar( FileStorage& fs, int value )
 {
     fs.p->write(String(), value);
@@ -1963,6 +2020,11 @@ void write( FileStorage& fs, const String& name, int value )
     fs.p->write(name, value);
 }
 
+void write( FileStorage& fs, const String& name, unsigned int value )
+{
+    fs.p->write(name, value);
+}
+
 void write( FileStorage& fs, const String& name, float value )
 {
     fs.p->write(name, (double)value);
@@ -1983,6 +2045,7 @@ void FileStorage::write(const String& name, double val) { p->write(name, val); }
 void FileStorage::write(const String& name, const String& val) { p->write(name, val); }
 void FileStorage::write(const String& name, const Mat& val) { cv::write(*this, name, val); }
 void FileStorage::write(const String& name, const std::vector<String>& val) { cv::write(*this, name, val); }
+void FileStorage::write(const String& name, unsigned int val) { p->write(name, val); }
 
 FileStorage& operator << (FileStorage& fs, const String& str)
 {
@@ -2156,9 +2219,10 @@ bool FileNode::empty() const   { return fs == 0; }
 bool FileNode::isNone() const  { return type() == NONE; }
 bool FileNode::isSeq() const   { return type() == SEQ; }
 bool FileNode::isMap() const   { return type() == MAP; }
-bool FileNode::isInt() const   { return type() == INT;  }
+bool FileNode::isInt() const   { return type() == INT; }
 bool FileNode::isReal() const  { return type() == REAL; }
-bool FileNode::isString() const { return type() == STRING;  }
+bool FileNode::isString() const { return type() == STRING; }
+bool FileNode::isUInt() const   { return type() == UINT; }
 bool FileNode::isNamed() const
 {
     const uchar* p = ptr();
@@ -2174,6 +2238,27 @@ std::string FileNode::name() const
         return std::string();
     size_t nameofs = p[1] | (p[2]<<8) | (p[3]<<16) | (p[4]<<24);
     return fs->getName(nameofs);
+}
+
+FileNode::operator unsigned int() const
+{
+    const uchar* p = ptr();
+    if(!p)
+        return 0;
+    int tag = *p;
+    int type = (tag & TYPE_MASK);
+    p += (tag & NAMED) ? 5 : 1;
+
+    if( type == UINT )
+    {
+        return readUInt(p);
+    }
+    else if( type == REAL )
+    {
+        return cvRound(readReal(p));
+    }
+    else
+        return 0xffffffff;
 }
 
 FileNode::operator int() const
@@ -2214,6 +2299,10 @@ FileNode::operator float() const
     {
         return (float)readReal(p);
     }
+    else if( type == UINT )
+    {
+        return (float)readUInt(p);
+    }
     else
         return FLT_MAX;
 }
@@ -2234,6 +2323,10 @@ FileNode::operator double() const
     else if( type == REAL )
     {
         return readReal(p);
+    }
+    else if (type == UINT)
+    {
+        return (double)readUInt(p);
     }
     else
         return DBL_MAX;
@@ -2286,7 +2379,7 @@ size_t FileNode::rawSize() const
     if( tag & NAMED )
         p += 4;
     size_t sz0 = (size_t)(p - p0);
-    if( tp == INT )
+    if( tp == INT || tp == UINT)
         return sz0 + 4;
     if( tp == REAL )
         return sz0 + 8;
@@ -2320,7 +2413,7 @@ void FileNode::setValue( int type, const void* value, int len )
     if( tag & NAMED )
         sz += 4;
 
-    if( type == INT )
+    if( type == INT || type == UINT)
         sz += 4;
     else if( type == REAL )
         sz += 8;
@@ -2355,6 +2448,11 @@ void FileNode::setValue( int type, const void* value, int len )
         writeInt(p, len + 1);
         memcpy(p + 4, str, len);
         p[4 + len] = (uchar)'\0';
+    }
+    else if (type == UINT)
+    {
+        unsigned int uival = *(const unsigned int*)value;
+        writeUInt(p, uival);
     }
 }
 
@@ -2609,6 +2707,15 @@ bool operator == ( const FileNodeIterator& it1, const FileNodeIterator& it2 )
 bool operator != ( const FileNodeIterator& it1, const FileNodeIterator& it2 )
 {
     return !it1.equalTo(it2);
+}
+
+void read(const FileNode& node, unsigned int& val, unsigned int default_val)
+{
+    val = default_val;
+    if( !node.empty() )
+    {
+        val = (unsigned int)node;
+    }
 }
 
 void read(const FileNode& node, int& val, int default_val)

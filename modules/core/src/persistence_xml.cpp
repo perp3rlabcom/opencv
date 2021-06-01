@@ -139,6 +139,12 @@ public:
         writeTag( current_struct.tag.c_str(), CV_XML_CLOSING_TAG );
     }
 
+    void write(const char* key, unsigned int value)
+    {
+        char buf[128], *ptr = fs::uitoa( value, buf, 10 );
+        writeScalar( key, ptr);
+    }
+
     void write(const char* key, int value)
     {
         char buf[128], *ptr = fs::itoa( value, buf, 10 );

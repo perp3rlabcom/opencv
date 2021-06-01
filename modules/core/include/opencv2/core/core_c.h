@@ -2053,6 +2053,16 @@ sequence.
  */
 CVAPI(void) cvWriteInt( CvFileStorage* fs, const char* name, int value );
 
+/** @brief Writes an unsigned integer value.
+
+The function writes a single unsigned integer value (with or without a name) to the file storage.
+@param fs File storage
+@param name Name of the written value. Should be NULL if and only if the parent structure is a
+sequence.
+@param value The written value
+ */
+CVAPI(void) cvWriteUInt( CvFileStorage* fs, const char* name, unsigned int value );
+
 /** @brief Writes a floating-point value.
 
 The function writes a single floating-point value (with or without a name) to file storage. Special

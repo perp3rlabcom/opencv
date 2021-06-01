@@ -101,6 +101,12 @@ public:
         assert( fs->struct_indent >= 0 );*/
     }
 
+    void write(const char* key, unsigned int value)
+    {
+        char buf[128];
+        writeScalar( key, fs::uitoa( value, buf, 10 ));
+    }
+
     void write(const char* key, int value)
     {
         char buf[128];

@@ -415,6 +415,8 @@ public:
     CV_WRAP void write(const String& name, const Mat& val);
     /// @overload
     CV_WRAP void write(const String& name, const std::vector<String>& val);
+    /// @overload
+    CV_WRAP void write(const String& name, unsigned int val);
 
     /** @brief Writes multiple numbers.
 
@@ -498,7 +500,8 @@ public:
         UNIFORM   = 8,  //!< if set, means that all the collection elements are numbers of the same type (real's or int's).
         //!< UNIFORM is used only when reading FileStorage; FLOW is used only when writing. So they share the same bit
         EMPTY     = 16, //!< empty structure (sequence or mapping)
-        NAMED     = 32  //!< the node has a name (i.e. it is element of a mapping).
+        NAMED     = 32,  //!< the node has a name (i.e. it is element of a mapping).
+        UINT      = 64 //!< an unsigned integer
     };
     /** @brief The constructors.
 
@@ -563,6 +566,8 @@ public:
     CV_WRAP bool isReal() const;
     //! returns true if the node is a text string
     CV_WRAP bool isString() const;
+    //! returns true if the node is an unsigned integer
+    CV_WRAP bool isUInt() const;
     //! returns true if the node has a name
     CV_WRAP bool isNamed() const;
     //! returns the node name or an empty string if the node is nameless
@@ -571,6 +576,8 @@ public:
     CV_WRAP size_t size() const;
     //! returns raw size of the FileNode in bytes
     CV_WRAP size_t rawSize() const;
+    //! returns the node content as an unsigned integer. If the node stores floating-point number, it is rounded.
+    operator unsigned int() const;
     //! returns the node content as an integer. If the node stores floating-point number, it is rounded.
     operator int() const;
     //! returns the node content as float
@@ -699,6 +706,7 @@ protected:
 //! @relates cv::FileStorage
 //! @{
 
+CV_EXPORTS void write( FileStorage& fs, const String& name, unsigned int value );
 CV_EXPORTS void write( FileStorage& fs, const String& name, int value );
 CV_EXPORTS void write( FileStorage& fs, const String& name, float value );
 CV_EXPORTS void write( FileStorage& fs, const String& name, double value );
@@ -710,6 +718,7 @@ CV_EXPORTS void write( FileStorage& fs, const String& name, const std::vector<Ke
 CV_EXPORTS void write( FileStorage& fs, const String& name, const std::vector<DMatch>& value);
 #endif
 
+CV_EXPORTS void writeScalar( FileStorage& fs, unsigned int value );
 CV_EXPORTS void writeScalar( FileStorage& fs, int value );
 CV_EXPORTS void writeScalar( FileStorage& fs, float value );
 CV_EXPORTS void writeScalar( FileStorage& fs, double value );
@@ -720,6 +729,7 @@ CV_EXPORTS void writeScalar( FileStorage& fs, const String& value );
 //! @relates cv::FileNode
 //! @{
 
+CV_EXPORTS void read(const FileNode& node, unsigned int& value, unsigned int default_value);
 CV_EXPORTS void read(const FileNode& node, int& value, int default_value);
 CV_EXPORTS void read(const FileNode& node, float& value, float default_value);
 CV_EXPORTS void read(const FileNode& node, double& value, double default_value);
@@ -891,6 +901,12 @@ template<typename _Tp> static inline
 void write(FileStorage& fs, const _Tp& value)
 {
     write(fs, String(), value);
+}
+
+template<> inline
+void write( FileStorage& fs, const unsigned int& value )
+{
+    writeScalar(fs, value);
 }
 
 template<> inline

@@ -85,6 +85,7 @@ namespace cv
 namespace fs
 {
 int strcasecmp(const char* str1, const char* str2);
+char* uitoa( unsigned int _val, char* buffer, int /*radix*/ );
 char* itoa( int _val, char* buffer, int /*radix*/ );
 char* floatToString( char* buf, float value, bool halfprecision, bool explicitZero );
 char* doubleToString( char* buf, double value, bool explicitZero );
@@ -173,6 +174,7 @@ public:
     virtual FStructData startWriteStruct( const FStructData& parent, const char* key,
                                           int struct_flags, const char* type_name=0 ) = 0;
     virtual void endWriteStruct(const FStructData& current_struct) = 0;
+    virtual void write(const char* key, unsigned int value) = 0;
     virtual void write(const char* key, int value) = 0;
     virtual void write(const char* key, double value) = 0;
     virtual void write(const char* key, const char* value, bool quote) = 0;

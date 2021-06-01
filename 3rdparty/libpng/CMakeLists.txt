@@ -27,9 +27,16 @@ ocv_include_directories("${CMAKE_CURRENT_SOURCE_DIR}" ${ZLIB_INCLUDE_DIRS})
 file(GLOB lib_srcs *.c)
 file(GLOB lib_hdrs *.h)
 
+#
+# Note on the 'ACAP_ARM' variable:
+# The ACAP_ARM was added to the conditions below in order to force
+# arm/arm_init.c, arm/filter_neon_intrinsics.c and arm/palette_neon_intrinsics.c
+# to be compiled for ACAP ARM. Without it, the result is 'undefined reference' during linking.
+# So set ACAP_ARM=ON to brutally force them to be built.
+#
 
-if(ARM OR AARCH64)
-  if(ENABLE_NEON)
+if(ARM OR AARCH64 OR ACAP_ARM) # Set ACAP_ARM=ON for ACAP workaround
+  if(ENABLE_NEON OR ACAP_ARM) # Set ACAP_ARM=ON for ACAP workaround
     if(NOT AARCH64)
       list(APPEND lib_srcs arm/filter_neon.S)
     endif()
